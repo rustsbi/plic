@@ -132,6 +132,7 @@ fn __plic_rt_machine_external_handler() {
     unsafe { 
         pac::PLIC::set_threshold(hart_id, prio);
         mie::clear_msoft();
+        mie::clear_mtimer();
     }
     
     let irq_index = irq as usize;
@@ -140,6 +141,7 @@ fn __plic_rt_machine_external_handler() {
     };
 
     unsafe { 
+        mie::set_mtimer();
         mie::set_msoft();
         pac::PLIC::set_threshold(hart_id, threshold);
     }
