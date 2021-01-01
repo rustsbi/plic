@@ -25,7 +25,6 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
             .into();
     }
 
-    let fspan = f.span();
     let ident = f.sig.ident.clone();
     let ident_s = ident.to_string();
 
@@ -47,7 +46,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 
     if !valid_signature {
         return parse::Error::new(
-            fspan,
+            f.sig.span(),
             "`#[interrupt]` handlers must have signature `[unsafe] fn() [-> !]`",
         )
         .to_compile_error()
