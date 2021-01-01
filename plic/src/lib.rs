@@ -12,7 +12,7 @@ pub struct Peripherals {
     plic: PLIC,
 }
 
-pub type PLIC = plic::Plic<{ 0x4000_0000 }>;
+pub type PLIC = plic::Plic<0x4000_0000>;
 */
 
 /// Platform-Level Interrupt Controller
