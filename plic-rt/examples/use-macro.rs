@@ -23,6 +23,7 @@ mod pac {
     
     #[doc(hidden)]
     pub union Vector {
+        // must be public for macro
         pub handler: unsafe extern "C" fn(),
         reserved: usize,
     }
@@ -34,12 +35,14 @@ mod pac {
         Vector { handler: SERIAL },
     ];
 
+    // must keep for macro to work
     pub type PLIC = plic::Plic<0x4000_0000>;
 }
 
 use pac::{interrupt, Interrupt};
 
 // if you modify function's name, it would become compile error
+// this is detected from fields in `pac::Interrupt`.
 
 #[interrupt]
 fn GPIO() {
@@ -50,6 +53,9 @@ fn GPIO() {
 fn SERIAL() { 
     // interrupt handler
 }
+
+// though there would be many interrupts in applications,
+// the macro would generate `MachineExternal` symbol, but only generate once 
 
 fn main() {
 

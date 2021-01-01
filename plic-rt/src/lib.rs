@@ -122,9 +122,8 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 
 fn gen_once_trap_handler() -> proc_macro2::TokenStream {
     quote!(
-
 #[export_name = "MachineExternal"]
-fn plic_trap_handler() {
+fn __plic_rt_machine_external_handler() {
     use riscv::register::{mhartid, mie};
 
     let hart_id = mhartid::read();
