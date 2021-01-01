@@ -18,7 +18,7 @@ mod pac {
 use pac::{interrupt, Interrupt};
 
 #[interrupt]
-fn GPIO() {
+fn GPIO() { // if you modify this function's name, it would become compile error
     
 }
 
