@@ -2,5 +2,4 @@
 members = [
     "plic",
     "plic-rt",
-    "plic-rt-macros",
 ]

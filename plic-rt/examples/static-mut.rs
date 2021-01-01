@@ -1,5 +1,5 @@
 mod pac {
-    pub use plic_rt_macros::interrupt;
+    pub use plic_rt::interrupt;
 
     #[doc = r"Enumeration of all the interrupts"]
     #[derive(Copy, Clone, Debug)]
@@ -13,6 +13,24 @@ mod pac {
             self as u16
         }
     }
+
+    extern {
+        fn GPIO();
+    }
+
+    #[doc(hidden)]
+    pub union Vector {
+        pub handler: unsafe extern "C" fn(),
+        reserved: usize,
+    }
+    
+    #[doc(hidden)]
+    pub static __INTERRUPTS: [Vector; 2] = [
+        Vector { reserved: 0 },
+        Vector { handler: GPIO },
+    ];
+
+    pub type PLIC = plic::Plic<0x4000_0000>;
 }
 
 use pac::{interrupt, Interrupt};

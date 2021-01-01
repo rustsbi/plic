@@ -118,6 +118,12 @@ pub trait Nr {
     fn number(self) -> u16;
 }
 
+impl Nr for u16 {
+    fn number(self) -> u16 {
+        self
+    }
+}
+
 // todo: highest priority is vendor defined
 
 /// Priority of an interrupt
