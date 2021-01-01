@@ -23,31 +23,31 @@ impl<const B: usize> Plic<B> {
 }
 
 impl<const B: usize> Plic<B> {
-    /// Check if interrupt is enabled for hart context
-    pub fn is_enabled<I: Nr>(hart_id: usize, interrupt: I) -> bool {
+    /// Check if interrupt is enabled for context
+    pub fn is_enabled<I: Nr>(context: usize, interrupt: I) -> bool {
         let irq_number = interrupt.number() as usize;
         unsafe {
-            (*Self::PTR).target_enables[hart_id].enable[irq_number / 32]
+            (*Self::PTR).enables[context].enable[irq_number / 32]
                 .read() & 1 << (irq_number % 32) != 0
         }
     }
 
-    /// Enable interrupt for hart context
+    /// Enable interrupt for context
     ///
     /// # Unsafety
     ///
     /// This function is unsafe because it can break mask-based critical sections
-    pub unsafe fn unmask<I: Nr>(hart_id: usize, interrupt: I) {
+    pub unsafe fn unmask<I: Nr>(context: usize, interrupt: I) {
         let irq_number = interrupt.number() as usize;
-        (*Self::PTR).target_enables[hart_id].enable[irq_number / 32]
+        (*Self::PTR).enables[context].enable[irq_number / 32]
             .modify(|v| v | 1 << (irq_number % 32));
     }
 
-    /// Disable interrupt for hart context
-    pub fn mask<I: Nr>(hart_id: usize, interrupt: I) { 
+    /// Disable interrupt for context
+    pub fn mask<I: Nr>(context: usize, interrupt: I) { 
         let irq_number = interrupt.number() as usize;
         unsafe {
-            (*Self::PTR).target_enables[hart_id].enable[irq_number / 32]
+            (*Self::PTR).enables[context].enable[irq_number / 32]
                 .modify(|v| v & !(1 << (irq_number % 32)));
         }
     }
@@ -72,37 +72,37 @@ impl<const B: usize> Plic<B> {
         (*Self::PTR).priority[irq_number].write(prio.into_bits());
     }
 
-    /// Get threshold for hart context
-    pub fn get_threshold(hart_id: usize) -> Priority {
+    /// Get threshold for context
+    pub fn get_threshold(context: usize) -> Priority {
         let bits = unsafe {
-            (*Self::PTR).targets[hart_id].threshold.read()
+            (*Self::PTR).contexts[context].threshold.read()
         };
         Priority::from_bits(bits)
     }
 
-    /// Set threshold for hart context
-    pub unsafe fn set_threshold(hart_id: usize, threshold: Priority) {
-        (*Self::PTR).targets[hart_id].threshold.write(threshold.into_bits());
+    /// Set threshold for context
+    pub unsafe fn set_threshold(context: usize, threshold: Priority) {
+        (*Self::PTR).contexts[context].threshold.write(threshold.into_bits());
     }
 
     /// Claim interrupt (used by interrupt runtime)
-    pub fn claim(hart_id: usize) -> Option<u16> {
+    pub fn claim(context: usize) -> Option<u16> {
         let bits = unsafe {
-            (*Self::PTR).targets[hart_id].claim.read()
+            (*Self::PTR).contexts[context].claim.read()
         };
         use core::convert::TryInto;
         bits.try_into().ok()
     }
 
     /// Complete interrupt (used by interrupt runtime)
-    pub fn complete<I: Nr>(hart_id: usize, interrupt: I) {
+    pub fn complete<I: Nr>(context: usize, interrupt: I) {
         let irq_number = interrupt.number() as u32;
         unsafe {
-            (*Self::PTR).targets[hart_id].claim.write(irq_number);
+            (*Self::PTR).contexts[context].claim.write(irq_number);
         }
     }
 
-    /// Checks if `interrupt` is pending
+    /// Checks if interrupt is pending
     pub fn is_pending<I: Nr>(interrupt: I) -> bool {
         let irq_number = interrupt.number() as usize;
         unsafe {
@@ -117,6 +117,8 @@ pub trait Nr {
     /// Valid values are within 0..=1023
     fn number(self) -> u16;
 }
+
+// todo: highest priority is vendor defined
 
 /// Priority of an interrupt
 #[derive(Clone, Copy, Debug)]

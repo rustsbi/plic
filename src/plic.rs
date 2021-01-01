@@ -21,7 +21,7 @@ pub struct RegisterBlock {
     /// base + 0x00107C: Interrupt Pending bit 992-1023
     pub pending: [RW<u32>; 128],
     _padding1: [u32; 896],
-    /// 0x002000 - Enable bits for sources
+    /// 0x002000 - Enable bits for sources on contexts
     ///
     /// base + 0x002000: Enable bits for sources 0-31 on context 0
     /// base + 0x002004: Enable bits for sources 32-63 on context 0
@@ -40,7 +40,7 @@ pub struct RegisterBlock {
     /// base + 0x1F1F84: Enable bits for sources 32-63 on context 15871
     /// base + 0x1F1FFF: Enable bits for sources 992-1023 on context 15871
     /// ...
-    pub target_enables: [TargetEnables; 15872],
+    pub enables: [Enables; 15872],
     _padding2: [u32; 1792],
     /// 0x200000 - Context configurations
     /// 
@@ -55,12 +55,12 @@ pub struct RegisterBlock {
     /// base + 0x3FFE000: Priority threshold for context 15871
     /// base + 0x3FFE004: Claim/complete for context 15871
     /// base + 0x3FFE008: Reserved
-    pub targets: [Targets; 15872],
+    pub contexts: [Contexts; 15872],
 }
 
 /// 0x002000 - Enable bits for sources
 #[repr(C)]
-pub struct TargetEnables {
+pub struct Enables {
     /// 0x000: Enable bits for sources
     pub enable: [RW<u32>; 32],
 }
@@ -68,11 +68,10 @@ pub struct TargetEnables {
 
 /// 0x200000 - Context configurations
 #[repr(C)]
-pub struct Targets {
+pub struct Contexts {
     /// 0x000: Priority threshold for context
     pub threshold: RW<u32>,
     /// 0x004: Claim/complete for context
     pub claim: RW<u32>,
     _reserved: [u32; 1022],
 }
-
