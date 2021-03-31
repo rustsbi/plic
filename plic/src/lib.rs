@@ -203,7 +203,7 @@ impl<const B: usize> Priority<B> {
     #[inline] fn into_bits(self) -> u32 {
         self.0
     }     
-    #[inline] fn from_bits(prio: u32) -> Priority<B> {
+    #[inline] pub fn from_bits(prio: u32) -> Priority<B> {
         if B == 32 {
             return Priority(prio); // always legal for B == 32
         }
