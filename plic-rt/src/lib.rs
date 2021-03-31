@@ -135,7 +135,7 @@ fn __plic_rt_machine_external_handler() {
         mie::clear_mtimer();
     }
     
-    let irq_index = irq as usize;
+    let irq_index: usize = irq.into();
     unsafe { 
         (pac::__INTERRUPTS[irq_index].handler)()
     };

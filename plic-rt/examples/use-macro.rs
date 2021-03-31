@@ -1,6 +1,7 @@
 mod pac {
     #![allow(unused)]
     pub use plic_rt::interrupt;
+    use core::convert::TryFrom;
 
     #[doc = r"Enumeration of all the interrupts"]
     #[derive(Copy, Clone, Debug)]
@@ -10,9 +11,10 @@ mod pac {
         SERIAL = 2,
     }
 
-    impl plic::Nr for Interrupt {
-        fn number(self) -> u16 {
-            self as u16
+    impl From<Interrupt> for plic::Nr {
+        fn from(src: Interrupt) -> plic::Nr {
+            // note(unwrap): always success for non zero numbers
+            plic::Nr::try_from(src as u16).unwrap()
         }
     }
 

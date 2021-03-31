@@ -15,6 +15,8 @@ pub struct Peripherals {
 pub type PLIC = plic::Plic<0x4000_0000>;
 */
 
+use core::{convert::{TryFrom, TryInto}, num::NonZeroU16};
+
 /// Platform-Level Interrupt Controller
 pub struct Plic<const B: usize>(());
 
@@ -24,8 +26,8 @@ impl<const B: usize> Plic<B> {
 
 impl<const B: usize> Plic<B> {
     /// Check if interrupt is enabled for context
-    pub fn is_enabled<I: Nr>(context: usize, interrupt: I) -> bool {
-        let irq_number = interrupt.number() as usize;
+    pub fn is_enabled(context: usize, interrupt: Nr) -> bool {
+        let irq_number = interrupt.index() as usize;
         unsafe {
             (*Self::PTR).enables[context].enable[irq_number / 32]
                 .read() & 1 << (irq_number % 32) != 0
@@ -37,15 +39,15 @@ impl<const B: usize> Plic<B> {
     /// # Unsafety
     ///
     /// This function is unsafe because it can break mask-based critical sections
-    pub unsafe fn unmask<I: Nr>(context: usize, interrupt: I) {
-        let irq_number = interrupt.number() as usize;
+    pub unsafe fn unmask(context: usize, interrupt: Nr) {
+        let irq_number = interrupt.index() as usize;
         (*Self::PTR).enables[context].enable[irq_number / 32]
             .modify(|v| v | 1 << (irq_number % 32));
     }
 
     /// Disable interrupt for context
-    pub fn mask<I: Nr>(context: usize, interrupt: I) { 
-        let irq_number = interrupt.number() as usize;
+    pub fn mask(context: usize, interrupt: Nr) { 
+        let irq_number = interrupt.index() as usize;
         unsafe {
             (*Self::PTR).enables[context].enable[irq_number / 32]
                 .modify(|v| v & !(1 << (irq_number % 32)));
@@ -53,8 +55,8 @@ impl<const B: usize> Plic<B> {
     }
 
     /// Get interrupt priority
-    pub fn get_priority<I: Nr>(interrupt: I) -> Priority { 
-        let irq_number = interrupt.number() as usize;
+    pub fn get_priority(interrupt: Nr) -> Priority { 
+        let irq_number = interrupt.index() as usize;
         let bits = unsafe {
             (*Self::PTR).priority[irq_number].read() 
         };
@@ -67,8 +69,8 @@ impl<const B: usize> Plic<B> {
     /// 
     /// Changing priority levels can break priority-based critical sections 
     /// and compromise memory safety.
-    pub unsafe fn set_priority<I: Nr>(interrupt: I, prio: Priority) { 
-        let irq_number = interrupt.number() as usize;
+    pub unsafe fn set_priority(interrupt: Nr, prio: Priority) { 
+        let irq_number = interrupt.index() as usize;
         (*Self::PTR).priority[irq_number].write(prio.into_bits());
     }
 
@@ -86,25 +88,24 @@ impl<const B: usize> Plic<B> {
     }
 
     /// Claim interrupt (used by interrupt runtime)
-    pub fn claim(context: usize) -> Option<u16> {
+    pub fn claim(context: usize) -> Option<Nr> {
         let bits = unsafe {
             (*Self::PTR).contexts[context].claim.read()
         };
-        use core::convert::TryInto;
-        bits.try_into().ok()
+        <Nr as TryFrom<u32>>::try_from(bits).ok()
     }
 
     /// Complete interrupt (used by interrupt runtime)
-    pub fn complete<I: Nr>(context: usize, interrupt: I) {
-        let irq_number = interrupt.number() as u32;
+    pub fn complete(context: usize, interrupt: Nr) {
+        let irq_number = interrupt.index() as u32;
         unsafe {
             (*Self::PTR).contexts[context].claim.write(irq_number);
         }
     }
 
     /// Checks if interrupt is pending
-    pub fn is_pending<I: Nr>(interrupt: I) -> bool {
-        let irq_number = interrupt.number() as usize;
+    pub fn is_pending(interrupt: Nr) -> bool {
+        let irq_number = interrupt.index() as usize;
         unsafe {
             (*Self::PTR).pending[irq_number / 32]
                 .read() & 1 << (irq_number % 32) != 0
@@ -113,14 +114,58 @@ impl<const B: usize> Plic<B> {
 }
 
 /// Interrupt number
-pub trait Nr {
-    /// Valid values are within 0..=1023
-    fn number(self) -> u16;
+///
+/// Valid number range are from 1..=1023; interrupt source 0 does not exist.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub struct Nr(NonZeroU16);
+
+impl Nr {
+    #[inline] fn index(&self) -> u16 {
+        self.0.into()
+    }
 }
 
-impl Nr for u16 {
-    fn number(self) -> u16 {
-        self
+impl TryFrom<u16> for Nr {
+    type Error = core::num::TryFromIntError;
+    fn try_from(src: u16) -> Result<Nr, Self::Error> {
+        let non_zero = src.try_into()?;
+        Ok(Nr(non_zero))
+    }
+}
+
+impl TryFrom<u32> for Nr {
+    type Error = core::num::TryFromIntError;
+    fn try_from(src: u32) -> Result<Nr, Self::Error> {
+        let src: u16 = src.try_into()?;
+        let non_zero = src.try_into()?;
+        Ok(Nr(non_zero))
+    }
+}
+
+impl TryFrom<usize> for Nr {
+    type Error = core::num::TryFromIntError;
+    fn try_from(src: usize) -> Result<Nr, Self::Error> {
+        let src: u16 = src.try_into()?;
+        let non_zero = src.try_into()?;
+        Ok(Nr(non_zero))
+    }
+}
+
+impl From<Nr> for u16 {
+    fn from(src: Nr) -> u16 {
+        src.0.into()
+    }
+}
+
+impl From<Nr> for u32 {
+    fn from(src: Nr) -> u32 {
+        <u16 as From<Nr>>::from(src).into()
+    }
+}
+
+impl From<Nr> for usize {
+    fn from(src: Nr) -> usize {
+        <u16 as From<Nr>>::from(src).into()
     }
 }
 
