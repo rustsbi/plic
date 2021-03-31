@@ -43,9 +43,6 @@ mod pac {
 
 use pac::{interrupt, Interrupt};
 
-// if you modify function's name, it would become compile error
-// this is detected from fields in `pac::Interrupt`.
-
 #[interrupt]
 fn GPIO() {
     // interrupt handler
@@ -56,9 +53,11 @@ fn SERIAL() {
     // interrupt handler
 }
 
-// though there would be many interrupts in applications,
-// the macro would generate `MachineExternal` symbol, but only generate once 
-
 fn main() {
-
+    let gpio_enabled = pac::PLIC::is_enabled(0, Interrupt::GPIO);
+    println!("Is GPIO interrupt enabled for context 0? {}", gpio_enabled);
+    println!("Now enable the GPIO interrupt for context 0.");
+    unsafe {
+        pac::PLIC::unmask(0, Interrupt::GPIO);
+    }
 }

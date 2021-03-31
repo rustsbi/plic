@@ -65,7 +65,6 @@ pub struct Enables {
     pub enable: [RW<u32>; 32],
 }
 
-
 /// 0x200000 - Context configurations
 #[repr(C)]
 pub struct Contexts {

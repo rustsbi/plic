@@ -32,7 +32,7 @@ mod pac {
         Vector { handler: GPIO },
     ];
 
-    pub type PLIC = plic::Plic<0x4000_0000>;
+    pub type PLIC = plic::Plic<0x4000_0000, 3>;
 }
 
 use pac::{interrupt, Interrupt};

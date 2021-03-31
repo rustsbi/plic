@@ -12,22 +12,24 @@ pub struct Peripherals {
     plic: PLIC,
 }
 
-pub type PLIC = plic::Plic<0x4000_0000>;
+// Base address = 0x4000_0000
+// Maximum level priority bits = 3 (Highest = P7)
+pub type PLIC = plic::Plic<0x4000_0000, 3>;
 */
 
 use core::{convert::{TryFrom, TryInto}, num::NonZeroU16};
 
 /// Platform-Level Interrupt Controller
-pub struct Plic<const B: usize>(());
+pub struct Plic<const P: usize, const B: usize>(pub(crate) ());
 
-impl<const B: usize> Plic<B> {
-    const PTR: *const plic::RegisterBlock = B as *const _;
+impl<const P: usize, const B: usize> Plic<P, B> {
+    const PTR: *const plic::RegisterBlock = P as *const _;
 }
 
-impl<const B: usize> Plic<B> {
+impl<const P: usize, const B: usize> Plic<P, B> {
     /// Check if interrupt is enabled for context
-    pub fn is_enabled(context: usize, interrupt: Nr) -> bool {
-        let irq_number = interrupt.index() as usize;
+    pub fn is_enabled(context: usize, interrupt: impl Into<Nr>) -> bool {
+        let irq_number = interrupt.into().index() as usize;
         unsafe {
             (*Self::PTR).enables[context].enable[irq_number / 32]
                 .read() & 1 << (irq_number % 32) != 0
@@ -39,15 +41,15 @@ impl<const B: usize> Plic<B> {
     /// # Unsafety
     ///
     /// This function is unsafe because it can break mask-based critical sections
-    pub unsafe fn unmask(context: usize, interrupt: Nr) {
-        let irq_number = interrupt.index() as usize;
+    pub unsafe fn unmask(context: usize, interrupt: impl Into<Nr>) {
+        let irq_number = interrupt.into().index() as usize;
         (*Self::PTR).enables[context].enable[irq_number / 32]
             .modify(|v| v | 1 << (irq_number % 32));
     }
 
     /// Disable interrupt for context
-    pub fn mask(context: usize, interrupt: Nr) { 
-        let irq_number = interrupt.index() as usize;
+    pub fn mask(context: usize, interrupt: impl Into<Nr>) { 
+        let irq_number = interrupt.into().index() as usize;
         unsafe {
             (*Self::PTR).enables[context].enable[irq_number / 32]
                 .modify(|v| v & !(1 << (irq_number % 32)));
@@ -55,8 +57,8 @@ impl<const B: usize> Plic<B> {
     }
 
     /// Get interrupt priority
-    pub fn get_priority(interrupt: Nr) -> Priority { 
-        let irq_number = interrupt.index() as usize;
+    pub fn get_priority(interrupt: impl Into<Nr>) -> Priority<B> { 
+        let irq_number = interrupt.into().index() as usize;
         let bits = unsafe {
             (*Self::PTR).priority[irq_number].read() 
         };
@@ -69,13 +71,13 @@ impl<const B: usize> Plic<B> {
     /// 
     /// Changing priority levels can break priority-based critical sections 
     /// and compromise memory safety.
-    pub unsafe fn set_priority(interrupt: Nr, prio: Priority) { 
-        let irq_number = interrupt.index() as usize;
+    pub unsafe fn set_priority(interrupt: impl Into<Nr>, prio: Priority<B>) { 
+        let irq_number = interrupt.into().index() as usize;
         (*Self::PTR).priority[irq_number].write(prio.into_bits());
     }
 
     /// Get threshold for context
-    pub fn get_threshold(context: usize) -> Priority {
+    pub fn get_threshold(context: usize) -> Priority<B> {
         let bits = unsafe {
             (*Self::PTR).contexts[context].threshold.read()
         };
@@ -83,7 +85,7 @@ impl<const B: usize> Plic<B> {
     }
 
     /// Set threshold for context
-    pub unsafe fn set_threshold(context: usize, threshold: Priority) {
+    pub unsafe fn set_threshold(context: usize, threshold: Priority<B>) {
         (*Self::PTR).contexts[context].threshold.write(threshold.into_bits());
     }
 
@@ -96,16 +98,16 @@ impl<const B: usize> Plic<B> {
     }
 
     /// Complete interrupt (used by interrupt runtime)
-    pub fn complete(context: usize, interrupt: Nr) {
-        let irq_number = interrupt.index() as u32;
+    pub fn complete(context: usize, interrupt: impl Into<Nr>) {
+        let irq_number = interrupt.into().index() as u32;
         unsafe {
             (*Self::PTR).contexts[context].claim.write(irq_number);
         }
     }
 
     /// Checks if interrupt is pending
-    pub fn is_pending(interrupt: Nr) -> bool {
-        let irq_number = interrupt.index() as usize;
+    pub fn is_pending(interrupt: impl Into<Nr>) -> bool {
+        let irq_number = interrupt.into().index() as usize;
         unsafe {
             (*Self::PTR).pending[irq_number / 32]
                 .read() & 1 << (irq_number % 32) != 0
@@ -172,51 +174,43 @@ impl From<Nr> for usize {
 // todo: highest priority is vendor defined
 
 /// Priority of an interrupt
-#[derive(Clone, Copy, Debug)]
-#[repr(u8)]
-pub enum Priority {
-    /// Priority 0: Never interrupt
-    P0,
-    /// Priority 1: Lowest active priority
-    P1,
-    /// Priority 2
-    P2,
-    /// Priority 3
-    P3,
-    /// Priority 4
-    P4,
-    /// Priority 5
-    P5,
-    /// Priority 6
-    P6,
-    /// Priority 7: Highest priority
-    P7,
+///
+/// Type parameter B means how many bits are supported in target implementation.
+/// For example if B = 3, highest priority would be 7 or 2^3 - 1, lowest would be 1.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub struct Priority<const B: usize>(pub(crate) u32);
+
+impl<const B: usize> Priority<B> {
+    /// Priority 0 means never interrupt
+    pub const fn never() -> Priority<B> {
+        Priority(0)
+    }
+    /// Returns the lowest active priority, or priority 1.
+    pub const fn lowest() -> Priority<B> {
+        Priority(1)
+    }
+    /// Returns the highest active priority, or priority (2 << B) - 1.
+    pub const fn highest() -> Priority<B> {
+        if B == 32 {
+            Priority(u32::MAX)
+        } else {
+            Priority((2 << B) - 1)
+        }
+    }
 }
 
-impl Priority {
-    fn into_bits(self) -> u32 {
-        match self {
-            Priority::P0 => 0,
-            Priority::P1 => 1,
-            Priority::P2 => 2,
-            Priority::P3 => 3,
-            Priority::P4 => 4,
-            Priority::P5 => 5,
-            Priority::P6 => 6,
-            Priority::P7 => 7,
-        }
+impl<const B: usize> Priority<B> {
+    #[inline] fn into_bits(self) -> u32 {
+        self.0
     }     
-    fn from_bits(prio: u32) -> Priority {
-        match prio {
-            0 => Priority::P0,
-            1 => Priority::P1,
-            2 => Priority::P2,
-            3 => Priority::P3,
-            4 => Priority::P4,
-            5 => Priority::P5,
-            6 => Priority::P6,
-            7 => Priority::P7,
-            _ => panic!("Invalid priority"),
+    #[inline] fn from_bits(prio: u32) -> Priority<B> {
+        if B == 32 {
+            return Priority(prio); // always legal for B == 32
+        }
+        if prio < (2 << B) {
+            Priority(prio)
+        } else {
+            panic!("invalid priority")
         }
     }
 }
