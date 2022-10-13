@@ -7,8 +7,8 @@ use quote::quote;
 use std::collections::HashSet;
 use std::iter;
 use syn::{
-    parse, spanned::Spanned, AttrStyle, Attribute, FnArg, Ident, Item, ItemFn,
-    ItemStatic, ReturnType, Stmt, Type, Visibility,
+    parse, spanned::Spanned, AttrStyle, Attribute, FnArg, Ident, Item, ItemFn, ItemStatic,
+    ReturnType, Stmt, Type, Visibility,
 };
 
 use std::sync::Once;
@@ -20,9 +20,12 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut f: ItemFn = syn::parse(input).expect("`#[interrupt]` must be applied to a function");
 
     if !args.is_empty() {
-        return parse::Error::new(Span::call_site(), "`#[interrupt]` attribute accepts no arguments")
-            .to_compile_error()
-            .into();
+        return parse::Error::new(
+            Span::call_site(),
+            "`#[interrupt]` attribute accepts no arguments",
+        )
+        .to_compile_error()
+        .into();
     }
 
     let ident = f.sig.ident.clone();
@@ -98,7 +101,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
         .collect::<Vec<_>>();
 
     let mut once_trap_handler = quote!();
-    
+
     HAS_TRAP_HANDLER.call_once(|| {
         once_trap_handler = gen_once_trap_handler();
     });
@@ -121,32 +124,30 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 
 fn gen_once_trap_handler() -> proc_macro2::TokenStream {
     quote!(
-#[export_name = "MachineExternal"]
-fn __plic_rt_machine_external_handler() {
-    use riscv::register::{mhartid, mie};
+        #[export_name = "MachineExternal"]
+        fn __plic_rt_machine_external_handler() {
+            use riscv::register::{mhartid, mie};
 
-    let hart_id = mhartid::read();
-    let threshold = pac::PLIC::get_threshold(hart_id);
-    let irq = pac::PLIC::claim(hart_id).unwrap();
-    let prio = pac::PLIC::get_priority(irq);
-    unsafe { 
-        pac::PLIC::set_threshold(hart_id, prio);
-        mie::clear_msoft();
-        mie::clear_mtimer();
-    }
-    
-    let irq_index: usize = irq.into();
-    unsafe { 
-        (pac::__INTERRUPTS[irq_index].handler)()
-    };
+            let hart_id = mhartid::read();
+            let threshold = pac::PLIC::get_threshold(hart_id);
+            let irq = pac::PLIC::claim(hart_id).unwrap();
+            let prio = pac::PLIC::get_priority(irq);
+            unsafe {
+                pac::PLIC::set_threshold(hart_id, prio);
+                mie::clear_msoft();
+                mie::clear_mtimer();
+            }
 
-    unsafe { 
-        mie::set_mtimer();
-        mie::set_msoft();
-        pac::PLIC::set_threshold(hart_id, threshold);
-    }
-    pac::PLIC::complete(hart_id, irq);
-}
+            let irq_index: usize = irq.into();
+            unsafe { (pac::__INTERRUPTS[irq_index].handler)() };
+
+            unsafe {
+                mie::set_mtimer();
+                mie::set_msoft();
+                pac::PLIC::set_threshold(hart_id, threshold);
+            }
+            pac::PLIC::complete(hart_id, irq);
+        }
     )
 }
 

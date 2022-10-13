@@ -1,7 +1,7 @@
 mod pac {
     #![allow(unused)]
-    pub use plic_rt::interrupt;
     use core::convert::TryFrom;
+    pub use plic_rt::interrupt;
 
     #[doc = r"Enumeration of all the interrupts"]
     #[derive(Copy, Clone, Debug)]
@@ -18,18 +18,18 @@ mod pac {
         }
     }
 
-    extern {
+    extern "C" {
         fn GPIO();
         fn SERIAL();
     }
-    
+
     #[doc(hidden)]
     pub union Vector {
         // must be public for macro
         pub handler: unsafe extern "C" fn(),
         reserved: usize,
     }
-    
+
     #[doc(hidden)]
     pub static __INTERRUPTS: [Vector; 3] = [
         Vector { reserved: 0 },
@@ -52,13 +52,11 @@ fn GPIO() {
 }
 
 #[interrupt]
-fn SERIAL() { 
+fn SERIAL() {
     // interrupt handler
 }
 
 // though there would be many interrupts in applications,
-// the macro would generate `MachineExternal` symbol, but only generate once 
+// the macro would generate `MachineExternal` symbol, but only generate once
 
-fn main() {
-
-}
+fn main() {}

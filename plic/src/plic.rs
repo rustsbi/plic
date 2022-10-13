@@ -43,7 +43,7 @@ pub struct RegisterBlock {
     pub enables: [Enables; 15872],
     _padding2: [u32; 1792],
     /// 0x200000 - Context configurations
-    /// 
+    ///
     /// base + 0x200000: Priority threshold for context 0
     /// base + 0x200004: Claim/complete for context 0
     /// base + 0x200008: Reserved
